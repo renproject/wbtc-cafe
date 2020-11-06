@@ -62,8 +62,11 @@ export const App: React.FC = () => {
     // default to mainnet
     setNetwork(network).catch(console.error);
 
-    initDataWeb3(network).catch(console.error);
-    updateRenVMFees().catch(console.error);
+    initDataWeb3(network)
+      .catch(console.error)
+      .then(() => {
+        updateRenVMFees().catch(console.error);
+      });
   }, []); //eslint-disable-line react-hooks/exhaustive-deps
 
   return (

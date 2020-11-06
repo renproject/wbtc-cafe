@@ -6,7 +6,29 @@ import TableCell from "@material-ui/core/TableCell";
 import TableHead from "@material-ui/core/TableHead";
 import TableRow from "@material-ui/core/TableRow";
 import Typography from "@material-ui/core/Typography";
-import React from "react";
+import React, { useEffect, useMemo } from "react";
+
+import {
+  mintChainMap,
+  lockChainMap,
+  burnChainMap,
+  releaseChainMap,
+  CustomParams,
+} from "../utils/chainMaps";
+
+import {
+  mintMachine,
+  burnMachine,
+  GatewaySession,
+  BurnMachineContext,
+  GatewayTransaction,
+  depositMachine,
+} from "@renproject/rentx";
+
+import RenJS from "@renproject/ren";
+import { useMachine } from "@xstate/react";
+
+import { Actor, Interpreter } from "xstate";
 
 import { ActionLink } from "../components/ActionLink";
 import { ConversionActions } from "../components/ConversionActions";
@@ -14,6 +36,8 @@ import { ConversionStatus } from "../components/ConversionStatus";
 import { Store } from "../store/store";
 import { Web3Store } from "../store/web3Store";
 import { Asset } from "../utils/assets";
+import { Transaction } from "../types/transaction";
+import { TransactionStore } from "../store/transactionStore";
 
 const useStyles = makeStyles((theme) => ({
   container: {
@@ -36,6 +60,97 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
+const mapGatewaySessionToWBTCTx = (
+  session: GatewaySession<CustomParams>,
+  awaiting: string,
+  error: boolean
+): Transaction => {
+  const deposit = Object.values(session.transactions || {})[0];
+  return {
+    id: session.id,
+    type: session.type === "mint" ? "mint" : "burn",
+    sourceAsset: session.sourceAsset,
+    sourceNetwork: session.sourceNetwork,
+    sourceNetworkVersion: session.network === "testnet" ? "testnet" : "mainnet",
+    destNetworkVersion: session.network === "testnet" ? "testnet" : "mainnet",
+    destAddress: session.destAddress,
+    destAsset: session.destAsset,
+    destNetwork: session.destNetwork,
+    amount: session.targetAmount,
+    renBtcAddress: session.gatewayAddress,
+    localWeb3Address: session.userAddress,
+    sourceTxHash: deposit?.sourceTxHash,
+    sourceAmount: deposit?.sourceTxAmount,
+    sourceTxConfs: deposit?.sourceTxConfs || 0,
+    sourceTxVOut: deposit?.sourceTxVOut,
+    destTxConfs: deposit?.destTxConfs,
+    destTxHash: deposit?.destTxHash,
+    renResponse: deposit?.renResponse,
+    renSignature: deposit?.renSignature,
+    params: { nonce: session.nonce, ...(session.customParams?.params || {}) },
+    adapterAddress: session.customParams?.adapterAddress!,
+    maxSlippage: session.customParams?.maxSlippage!,
+    minSwapProceeds: session.customParams?.minSwapProceeds!,
+    minExchangeRate: session.customParams?.minExchangeRate!,
+    instant: false,
+    awaiting,
+    error,
+  };
+};
+
+const mapWBTCTxToGatewaySession = (
+  tx: Transaction
+): GatewaySession<CustomParams> => {
+  // Don't restore txs because we old model doesnt have txhash in the correct format
+  /* const transactions: { [k in string]: GatewayTransaction } = false
+   *   ? {
+   *       [tx.sourceTxHash]: {
+   *         sourceTxHash: tx.sourceTxHash,
+   *         sourceTxAmount: Number(tx.sourceAmount) || 0,
+   *         sourceTxConfs: tx.sourceTxConfs || 0,
+   *         sourceTxVOut: tx.sourceTxVOut,
+   *         sourceTxConfTarget: 2,
+   *         destTxConfs: tx.destTxConfs,
+   *         destTxHash: tx.destTxHash,
+   *         destTxConfTarget: 6,
+   *         rawSourceTx: {
+   *           transaction: {
+   *             confirmations: tx.sourceTxConfs,
+   *             txHash: tx.sourceTxHash,
+   *             vOut: tx.sourceTxVOut,
+   *             amount: Number(tx.sourceAmount),
+   *           },
+   *           amount: Number(tx.sourceAmount),
+   *         },
+   *       },
+   *     }
+   *   : {}; */
+
+  return {
+    id: tx.id,
+    type: tx.sourceAsset.toLowerCase() === "btc" ? "mint" : "burn",
+    gatewayAddress: tx.renBtcAddress,
+    sourceAsset: tx.sourceAsset,
+    sourceNetwork: tx.sourceNetwork,
+    network: tx.sourceNetworkVersion === "testnet" ? "testnet" : "mainnet",
+    destAddress: tx.destAddress,
+    destAsset: tx.destAsset,
+    destNetwork: tx.destNetwork,
+    targetAmount: tx.amount,
+    userAddress: tx.localWeb3Address,
+    expiryTime: Number.POSITIVE_INFINITY,
+    nonce: tx.params?.nonce,
+    customParams: {
+      params: tx.params,
+      adapterAddress: tx.adapterAddress,
+      maxSlippage: tx.maxSlippage,
+      minSwapProceeds: tx.minSwapProceeds,
+      minExchangeRate: Number(tx.minExchangeRate!),
+    },
+    transactions: {},
+  };
+};
+
 export const TransactionsTableContainer: React.FC = () => {
   const classes = useStyles();
   const {
@@ -44,6 +159,7 @@ export const TransactionsTableContainer: React.FC = () => {
     fsSignature,
     loadingTransactions,
     walletConnectError,
+    localWeb3,
   } = Store.useContainer();
 
   const { initLocalWeb3 } = Web3Store.useContainer();
@@ -57,6 +173,11 @@ export const TransactionsTableContainer: React.FC = () => {
 
   const showTransactions =
     signedIn && !loadingTransactions && !error && transactions.size > 0;
+
+  const sdk = useMemo(() => new RenJS("testnet"), []);
+  const providers = useMemo(() => ({ ethereum: localWeb3?.currentProvider }), [
+    localWeb3,
+  ]);
 
   return (
     <div className={classes.container}>
@@ -77,29 +198,20 @@ export const TransactionsTableContainer: React.FC = () => {
                 return (txa.txCreatedAt ?? 0) < (txb?.txCreatedAt ?? 0) ? 1 : 0;
               })
               .map((tx, i) => {
-                const destAsset = tx.swapReverted
-                  ? Asset.renBTC
-                  : tx.destAsset.toUpperCase();
-                const sourceAsset = tx.sourceAsset.toUpperCase();
-                return (
-                  <TableRow key={i}>
-                    <TableCell align="left">
-                      <Typography variant="caption">
-                        {tx.sourceAmount ? tx.sourceAmount : tx.amount}{" "}
-                        {sourceAsset} → {destAsset}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="caption">
-                        <ConversionStatus tx={tx} />
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Grid container justify="flex-end">
-                        <ConversionActions tx={tx} />
-                      </Grid>
-                    </TableCell>
-                  </TableRow>
+                return tx.sourceAsset.toLowerCase() === "btc" ? (
+                  <MintTxProcessor
+                    key={tx.id}
+                    tx={tx}
+                    sdk={sdk}
+                    providers={providers}
+                  />
+                ) : (
+                  <BurnTxProcessor
+                    key={tx.id}
+                    tx={tx}
+                    sdk={sdk}
+                    providers={providers}
+                  />
                 );
               })}
         </TableBody>
@@ -133,5 +245,178 @@ export const TransactionsTableContainer: React.FC = () => {
         )}
       </div>
     </div>
+  );
+};
+
+function usePersistence<TContext extends { tx: GatewaySession }>(
+  service: Interpreter<TContext, any, any>
+) {
+  const { updateTx } = TransactionStore.useContainer();
+  useEffect(() => {
+    const subscription = service.subscribe((state: any) => {
+      updateTx(
+        mapGatewaySessionToWBTCTx(
+          state.context.tx,
+          state.value as string,
+          false
+        )
+      );
+    });
+    return () => subscription.unsubscribe();
+  }, [service, updateTx]);
+}
+
+const BurnTxProcessor: React.FC<{
+  tx: Transaction;
+  sdk: RenJS;
+  providers: any;
+}> = ({ tx, sdk, providers }) => {
+  const [current, _, service] = useMachine(burnMachine, {
+    context: {
+      tx: mapWBTCTxToGatewaySession(tx) as any,
+      sdk,
+      providers,
+      fromChainMap: burnChainMap,
+      toChainMap: releaseChainMap,
+    },
+    //devTools: true,
+  });
+
+  usePersistence(service);
+
+  // Clean up machine when component unmounts
+  useEffect(
+    () => () => {
+      service.stop();
+    },
+    [service]
+  );
+
+  const remove = () => {
+    // removeTx(tx);
+  };
+
+  const castTx = useMemo(() => {
+    let awaiting = "btc-init";
+    if (current.value) {
+      const statusMap: { [key in string]: string } = {
+        restoring: "ren-settle",
+        restored: "ren-settle",
+        srcSettling: "eth-settle",
+        srcConfirmed: "ren-settle",
+        accepted: "btc-init",
+        claiming: "btc-settle",
+        destInitiated: "eth-settle",
+        completed: "",
+      };
+      awaiting = statusMap[current.value as string];
+    }
+    return mapGatewaySessionToWBTCTx(
+      current.context.tx as any,
+      awaiting,
+      false
+    );
+  }, [current]);
+
+  return (
+    <TableRow>
+      <TableCell align="left">
+        <Typography variant="caption">
+          {current.context.tx.targetAmount} {current.context.tx.sourceAsset} →{" "}
+          {current.context.tx.destAsset}
+        </Typography>
+      </TableCell>
+      <TableCell>
+        <Typography variant="caption">
+          <ConversionStatus tx={castTx} />
+        </Typography>
+      </TableCell>
+      <TableCell>
+        <Grid container justify="flex-end">
+          <ConversionActions tx={castTx} />
+        </Grid>
+      </TableCell>
+    </TableRow>
+  );
+};
+
+const MintTxProcessor: React.FC<{
+  tx: Transaction;
+  sdk: RenJS;
+  providers: any;
+}> = ({ tx, sdk, providers }) => {
+  const [current, send, service] = useMachine(mintMachine, {
+    context: {
+      tx: mapWBTCTxToGatewaySession(tx) as any,
+      sdk,
+      providers,
+      fromChainMap: lockChainMap,
+      toChainMap: mintChainMap,
+    },
+    devTools: true,
+  });
+
+  // We listen to state transitions to de-couple persistance
+  usePersistence(service);
+
+  const remove = () => {
+    send("EXPIRED");
+  };
+
+  // We have to determine which deposit is the "correct" one for a transaction
+  // We could list out every deposit, and all will be able to proceed correctly
+  // but that is not a recommended flow to introduce to users
+  const activeDeposit = useMemo<{
+    deposit: GatewayTransaction;
+    machine: Actor<typeof depositMachine>;
+  } | null>(() => {
+    const deposit = Object.values(current.context.tx.transactions)[0];
+    if (!deposit || !current.context.depositMachines) return null;
+    const machine = current.context.depositMachines[deposit.sourceTxHash];
+    if (!machine) return null;
+    return { deposit, machine };
+  }, [current.context]);
+
+  const castTx = useMemo(() => {
+    let awaiting = "btc-init";
+    if (activeDeposit?.machine) {
+      const statusMap: { [key in string]: string } = {
+        restoring: "ren-settle",
+        restored: "ren-settle",
+        srcSettling: "btc-settle",
+        srcConfirmed: "ren-settle",
+        accepted: "eth-init",
+        claiming: "eth-settle",
+        destInitiated: "eth-settle",
+        completed: "",
+      };
+      awaiting = statusMap[activeDeposit.machine.state.value];
+    }
+    return mapGatewaySessionToWBTCTx(
+      current.context.tx as any,
+      awaiting,
+      false
+    );
+  }, [current, activeDeposit]);
+
+  return (
+    <TableRow>
+      <TableCell align="left">
+        <Typography variant="caption">
+          {current.context.tx.targetAmount} {current.context.tx.sourceAsset} →{" "}
+          {current.context.tx.destAsset}
+        </Typography>
+      </TableCell>
+      <TableCell>
+        <Typography variant="caption">
+          <ConversionStatus tx={castTx} />
+        </Typography>
+      </TableCell>
+      <TableCell>
+        <Grid container justify="flex-end">
+          <ConversionActions tx={castTx} />
+        </Grid>
+      </TableCell>
+    </TableRow>
   );
 };

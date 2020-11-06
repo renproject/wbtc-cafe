@@ -180,7 +180,7 @@ export const TransferContainer: React.FC = () => {
     setConvertDestinationValid,
   } = Store.useContainer();
 
-  const { initConvertFromEthereum } = TransactionStore.useContainer();
+  const { addTx } = TransactionStore.useContainer();
 
   const { gatherFeeData } = FeeStore.useContainer();
 
@@ -278,7 +278,8 @@ export const TransferContainer: React.FC = () => {
       localWeb3Address: localWeb3Address.toLowerCase(),
     };
 
-    initConvertFromEthereum(tx).catch(console.error);
+    addTx(tx);
+    //initConvertFromEthereum(tx).catch(console.error);
   };
 
   const selectedDirection = convertSelectedDirection;

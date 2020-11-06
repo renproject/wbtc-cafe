@@ -147,7 +147,7 @@ export const DepositModalContainer: React.FC = () => {
     setDepositModalTx(null);
 
     setShowGatewayModal(true);
-    setGatewayModalTx(depositModalTx && depositModalTx.id);
+    setGatewayModalTx(depositModalTx!);
   };
 
   const check = () => {

@@ -31,7 +31,7 @@ export const ConversionActions: React.FC<Props> = ({ tx }) => {
   } = Store.useContainer();
   const {
     completeConvertToEthereum,
-    initConvertFromEthereum,
+    // initConvertFromEthereum,
     removeTx,
   } = TransactionStore.useContainer();
 
@@ -70,7 +70,7 @@ export const ConversionActions: React.FC<Props> = ({ tx }) => {
               onClick={() => {
                 // view modal
                 setShowGatewayModal(true);
-                setGatewayModalTx(tx.id);
+                setGatewayModalTx(tx);
               }}
             >
               View Gateway Address
@@ -119,7 +119,7 @@ export const ConversionActions: React.FC<Props> = ({ tx }) => {
               className={classes.viewLink}
               onClick={() => {
                 if (direction === "out") {
-                  initConvertFromEthereum(tx);
+                  // initConvertFromEthereum(tx);
                 } else {
                   completeConvertToEthereum(tx);
                 }

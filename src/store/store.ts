@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { UnmarshalledFees } from "@renproject/interfaces";
+import { RenVMFees } from "@renproject/interfaces";
 import RenJS from "@renproject/ren";
 import Web3 from "web3";
 import { createContainer } from "unstated-next";
@@ -12,8 +12,16 @@ import { ADAPTER_TEST } from "../utils/environmentVariables";
 
 require("dotenv").config();
 
+const MockDB: Database<Transaction> = {
+  addTx: async () => {},
+  updateTx: async () => {},
+  deleteTx: async () => {},
+  getUser: async () => ({ uid: "mock" }),
+  getTxs: async () => [],
+};
+
 const useStore = (database: Database<Transaction> | undefined) => {
-  const [db, setDb] = useState(database || newDefaultDatabase<Transaction>());
+  const [db, setDb] = useState(MockDB); //database || newDefaultDatabase<Transaction>());
 
   // networking
   const [wbtcAddress, setWbtcAddress] = useState("");
@@ -27,7 +35,7 @@ const useStore = (database: Database<Transaction> | undefined) => {
   const [walletConnectError, setWalletConnectError] = useState(false);
   const [wbtcBalance, setWbtcBalance] = useState(0 as number | string);
   const [sdk, setSdk] = useState(null as RenJS | null);
-  const [fees, setFees] = useState(null as UnmarshalledFees | null);
+  const [fees, setFees] = useState(null as RenVMFees | null);
   const [fsUser, setFsUser] = useState(
     null as {
       uid: string;
@@ -47,7 +55,7 @@ const useStore = (database: Database<Transaction> | undefined) => {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelModalTx, setCancelModalTx] = useState(null as string | null);
   const [showGatewayModal, setShowGatewayModal] = useState(false);
-  const [gatewayModalTx, setGatewayModalTx] = useState(null as string | null);
+  const [gatewayModalTx, setGatewayModalTx] = useState<Transaction>();
   const [showSwapRevertModal, setShowSwapRevertModal] = useState(false);
   const [swapRevertModalTx, setSwapRevertModalTx] = useState(
     null as string | null

@@ -52,7 +52,7 @@ function useWeb3() {
     setConvertAdapterWbtcAllowance,
   } = Store.useContainer();
 
-  const { initMonitoringTrigger } = TransactionStore.useContainer();
+  // const { initMonitoringTrigger } = TransactionStore.useContainer();
 
   const { gatherFeeData, updateRenVMFees } = FeeStore.useContainer();
 
@@ -283,7 +283,7 @@ function useWeb3() {
 
       watchWalletData().catch(console.error);
       updateRenVMFees().then(() => gatherFeeData().catch(console.error));
-      initMonitoringTrigger();
+      // initMonitoringTrigger();
 
       if ((currentProvider as any)?.on) {
         // listen for changes
@@ -311,7 +311,6 @@ function useWeb3() {
     disclosureAccepted,
     gatherFeeData,
     getSignatures,
-    initMonitoringTrigger,
     selectedNetwork,
     setConvertTransactions,
     setDisclosureAccepted,
@@ -341,11 +340,11 @@ function useWeb3() {
   );
 
   const setNetwork = useCallback(
-    async function (network: string) {
+    async function (network: "mainnet" | "testnet") {
       setSelectedNetwork(network);
       setSdk(new RenSDK(network));
 
-      setAddresses(network).catch(console.error);
+      await setAddresses(network).catch(console.error);
     },
     [setAddresses, setSdk, setSelectedNetwork]
   );

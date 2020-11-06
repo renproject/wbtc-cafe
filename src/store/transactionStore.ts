@@ -66,7 +66,7 @@ function useTransactionStore() {
         }
         return t;
       });
-      setConvertTransactions(List(txs.toArray()));
+      // setConvertTransactions(List(txs.toArray()));
 
       // use localStorage
       localStorage.setItem(storeString, JSON.stringify(txs));
@@ -150,8 +150,8 @@ function useTransactionStore() {
   const {
     completeConvertToEthereum,
     initConvertToEthereum,
-    initConvertFromEthereum,
-    initMonitoringTrigger,
+    // initConvertFromEthereum,
+    // initMonitoringTrigger,
   } = useTransactionLifecycle(addTx, getTx, updateTx, txExists);
 
   return {
@@ -160,8 +160,9 @@ function useTransactionStore() {
     removeTx,
     completeConvertToEthereum,
     initConvertToEthereum,
-    initConvertFromEthereum,
-    initMonitoringTrigger,
+    addTx,
+    // initConvertFromEthereum,
+    // initMonitoringTrigger,
   };
 }
 

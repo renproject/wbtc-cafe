@@ -101,16 +101,14 @@ export const ViewGatewayContainer: React.FC = () => {
 
   const goBack = () => {
     setShowGatewayModal(false);
-    setGatewayModalTx(null);
+    setGatewayModalTx(undefined);
   };
 
-  const transaction = convertTransactions
-    .filter((tx) => tx.id === gatewayModalTx)
-    .first(null);
+  const transaction = gatewayModalTx;
 
-  if (!gatewayModalTx || !transaction) return null;
+  if (!gatewayModalTx) return null;
 
-  return (
+  return transaction ? (
     <Modal
       aria-labelledby="transition-modal-title"
       aria-describedby="transition-modal-description"
@@ -186,5 +184,7 @@ export const ViewGatewayContainer: React.FC = () => {
         </Grid>
       </Fade>
     </Modal>
+  ) : (
+    <div></div>
   );
 };

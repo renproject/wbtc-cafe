@@ -1,5 +1,4 @@
 import { AbiItem } from "web3-utils";
-import { UnmarshalledFees } from "@renproject/interfaces";
 import { useCallback, useEffect, useState } from "react";
 import curveABI from "../utils/ABIs/curveABI.json";
 import { CURVE_MAIN, CURVE_TEST } from "../utils/environmentVariables";
@@ -8,6 +7,8 @@ import { Asset } from "../utils/assets";
 import RenJS from "@renproject/ren";
 import { Transaction } from "../types/transaction";
 import { createContainer } from "unstated-next";
+import { RenVMFees } from "@renproject/interfaces";
+import { Bitcoin } from "@renproject/chains-bitcoin";
 
 export function useFeesStore() {
   const {
@@ -21,6 +22,7 @@ export function useFeesStore() {
     setConvertRenVMFee,
     setConvertNetworkFee,
     setConvertConversionTotal,
+    sdk,
 
     setFees,
   } = Store.useContainer();
@@ -28,45 +30,43 @@ export function useFeesStore() {
   // External Data
   const updateRenVMFees = useCallback(async () => {
     try {
-      const fees = await fetch("https://lightnode-mainnet.herokuapp.com", {
-        method: "POST", // or 'PUT'
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          id: 67,
-          jsonrpc: "2.0",
-          method: "ren_queryFees",
-          params: {},
-        }),
-      });
-      const data: UnmarshalledFees = (await fees.json()).result;
-      setFees(data);
+      const data = await sdk?.getFees();
+      if (data) {
+        setFees(data);
+        return data;
+      } else {
+        throw Error("no fee data");
+      }
     } catch (e) {
       console.error(e);
     }
-  }, [setFees]);
+  }, [setFees, sdk]);
 
   const gatherFeeData = useCallback(
     async (directAmount?: number) => {
+      let currentFees = fees;
+      if (!fees) {
+        currentFees = await updateRenVMFees();
+      }
       const amount = directAmount || convertAmount;
       const selectedDirection = convertSelectedDirection;
       const fixedFeeKey = selectedDirection ? "release" : "lock";
       const dynamicFeeKey = selectedDirection ? "burn" : "mint";
 
-      const fixedFee = Number(fees![Asset.BTC][fixedFeeKey] / 10 ** 8);
+      const fixedFee = Number(currentFees![Asset.BTC][fixedFeeKey] / 10 ** 8);
       const dynamicFeeRate = Number(
-        fees![Asset.BTC].ethereum[dynamicFeeKey] / 10000
+        currentFees![Asset.BTC].ethereum[dynamicFeeKey] / 10000
       );
 
-      if (!amount || !dataWeb3 || !fees) return;
+      if (!amount || !dataWeb3 || !currentFees) return;
 
       try {
         let exchangeRate: number;
         let renVMFee: number;
         let total: number | string;
         const amountInSats = Math.round(
-          RenJS.utils.value(amount, Asset.BTC).sats().toNumber()
+          Number(amount) *
+            10 ** Bitcoin().assetDecimals(Asset.BTC.toUpperCase())
         );
         const curve = new dataWeb3.eth.Contract(
           curveABI as AbiItem[],
@@ -90,7 +90,8 @@ export function useFeesStore() {
               ? Number(Number(amount) - renVMFee - fixedFee)
               : 0;
           const amountAfterMintInSats = Math.round(
-            RenJS.utils.value(amountAfterMint, Asset.BTC).sats().toNumber()
+            Number(amountAfterMint) *
+              10 ** Bitcoin().assetDecimals(Asset.BTC.toUpperCase())
           );
 
           if (amountAfterMintInSats) {
@@ -136,7 +137,7 @@ export function useFeesStore() {
     async (tx: Transaction) => {
       const { renResponse } = tx;
 
-      const utxoAmountInSats = Number(renResponse.autogen.amount);
+      const utxoAmountInSats = Number(renResponse.out.amount);
       const dynamicFeeRate = Number(fees![Asset.BTC].ethereum["mint"] / 10000);
       const finalAmount = Math.round(utxoAmountInSats * (1 - dynamicFeeRate));
 

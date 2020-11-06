@@ -13,6 +13,13 @@ import { theme } from "./theme/theme";
 import { Transaction } from "./types/transaction";
 import { newDefaultDatabase } from "./utils/database/defaultDatabase";
 import { FeeStore } from "./store/feeStore";
+import { inspect } from "@xstate/inspect";
+
+inspect({
+  // options
+  // url: 'https://statecharts.io/inspect', // (default)
+  iframe: false, // open in new window
+});
 
 const database = newDefaultDatabase<Transaction>();
 
