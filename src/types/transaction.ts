@@ -1,3 +1,5 @@
+import { LockAndMintTransaction } from "@renproject/interfaces";
+
 export interface Transaction {
   id: string;
   type: string;
@@ -29,7 +31,7 @@ export interface Transaction {
   sourceTxConfs?: number;
   renBtcAddress?: string;
   btcConfirmations?: number;
-  renResponse?: any;
+  renResponse?: LockAndMintTransaction["out"];
   renSignature?: any;
   params?: any;
 

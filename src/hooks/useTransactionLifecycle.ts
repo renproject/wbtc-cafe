@@ -9,6 +9,8 @@ import adapterABI from "../utils/ABIs/adapterCurveABI.json";
 import { Asset } from "../utils/assets";
 import Web3 from "web3";
 import { Transaction as EthTransaction } from "web3-core";
+import { mintChainMap } from "../utils/chainMaps";
+import { Bitcoin } from "@renproject/chains";
 
 export enum TransactionEventType {
   // Transaction loaded from persistence, and needs to have lifecyle action determined
@@ -51,7 +53,7 @@ export interface TransactionLifecycleMethods {
   completeConvertToEthereum: (
     transaction: Transaction,
     approveSwappedAsset?: string
-  ) => Promise<void>;
+  ) => Promise<void | string>;
   initConvertToEthereum: (tx: Transaction) => Promise<void>;
   // initConvertFromEthereum: (tx: Transaction) => Promise<void>;
 }
@@ -180,17 +182,20 @@ export function useTransactionLifecycle(
   // and then submits to ethereum
   const completeConvertToEthereum = useCallback(
     async (transaction: Transaction, approveSwappedAsset?: string) => {
-      if (!localWeb3) {
+      if (
+        !localWeb3 ||
+        !transaction.renResponse ||
+        transaction.renResponse?.revert
+      ) {
         return;
       }
-      const renResponse = transaction.renResponse;
 
       // amount user sent
       const userBtcTxAmount = Number(
-        (renResponse.in.utxo.amount / 10 ** 8).toFixed(8)
+        (Number(transaction.sourceAmount) / 10 ** 8).toFixed(8)
       );
       // amount in renvm after fixed fee
-      const utxoAmountSats = renResponse.out.amount;
+      const utxoAmountSats = transaction.renResponse?.amount;
 
       // update amount to the actual amount sent
       const tx = updateTx({ ...transaction, sourceAmount: userBtcTxAmount });
@@ -220,24 +225,49 @@ export function useTransactionLifecycle(
         newMinExchangeRate = rateMinusOne.toFixed(0);
       }
 
-      // const adapterContract = new localWeb3.eth.Contract(
-      //   adapterABI as AbiItem[],
-      //   tx.adapterAddress
-      // );
+      const adapterContract = new localWeb3.eth.Contract(
+        adapterABI as AbiItem[],
+        tx.adapterAddress
+      );
 
+      if (!transaction.minExchangeRate) return;
       try {
-        // const contractCall = adapterContract.methods.mintThenSwap(
-        //   params.contractCalls[0].contractParams[0].value,
-        //   newMinExchangeRate,
-        //   params.contractCalls[0].contractParams[1].value,
-        //   params.contractCalls[0].contractParams[2].value,
-        //   utxoAmountSats,
-        //   renResponse.out.nhash,
-        //   renSignature
-        // );
-        // const gasParams = (localWeb3.currentProvider as any)?.isWalletConnect
-        //   ? await getGasParams(localWeb3, contractCall, localWeb3Address)
-        //   : {};
+        const contractCall = adapterContract.methods.mintThenSwap(
+          (
+            Number(transaction.minExchangeRate) *
+            10 ** Bitcoin().assetDecimals("BTC")
+          ).toFixed(0),
+          Number(
+            Number(newMinExchangeRate) * 10 ** Bitcoin().assetDecimals("BTC")
+          ).toFixed(0),
+          Number(transaction.maxSlippage * 10000).toFixed(0),
+          transaction.destAddress,
+          utxoAmountSats,
+          Buffer.from(
+            (transaction.renResponse.nhash as unknown) as string,
+            "hex"
+          ),
+          Buffer.from(
+            (transaction.renResponse.signature as unknown) as string,
+            "hex"
+          )
+        );
+        const gasParams = (localWeb3.currentProvider as any)?.isWalletConnect
+          ? await getGasParams(localWeb3, contractCall, localWeb3Address)
+          : {};
+        console.log(contractCall);
+        return Number(
+          Number(newMinExchangeRate) * 10 ** Bitcoin().assetDecimals("BTC")
+        ).toFixed(0);
+
+        // await contractCall
+        //   .send({
+        //     from: localWeb3Address,
+        //     ...gasParams,
+        //   })
+        //   .on("transactionHash", (hash: string) => {
+        //     console.log("hash");
+        //   });
       } catch (e) {
         Sentry.withScope(function (scope) {
           scope.setTag("error-hint", "error submitting mint");

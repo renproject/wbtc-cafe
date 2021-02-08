@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { RenVMFees } from "@renproject/interfaces";
 import RenJS from "@renproject/ren";
 import Web3 from "web3";
 import { createContainer } from "unstated-next";
@@ -7,8 +6,16 @@ import { List } from "immutable";
 
 import { Transaction } from "../types/transaction";
 import { Database } from "../utils/database/database";
-import { newDefaultDatabase } from "../utils/database/defaultDatabase";
 import { ADAPTER_TEST } from "../utils/environmentVariables";
+import BigNumber from "bignumber.js";
+import { RenNetwork } from "@renproject/interfaces";
+
+interface RenVMFees {
+  lock?: BigNumber;
+  release?: BigNumber;
+  mint: number;
+  burn: number;
+}
 
 require("dotenv").config();
 
@@ -26,7 +33,9 @@ const useStore = (database: Database<Transaction> | undefined) => {
   // networking
   const [wbtcAddress, setWbtcAddress] = useState("");
   const [adapterAddress, setAdapterAddress] = useState("");
-  const [selectedNetwork, setSelectedNetwork] = useState("");
+  const [selectedNetwork, setSelectedNetwork] = useState<RenNetwork>(
+    RenNetwork.Testnet
+  );
 
   // wallet & web3
   const [dataWeb3, setDataWeb3] = useState(null as Web3 | null);

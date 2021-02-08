@@ -1,21 +1,19 @@
 import { AbiItem } from "web3-utils";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import curveABI from "../utils/ABIs/curveABI.json";
 import { CURVE_MAIN, CURVE_TEST } from "../utils/environmentVariables";
 import { Store } from "./store";
 import { Asset } from "../utils/assets";
-import RenJS from "@renproject/ren";
 import { Transaction } from "../types/transaction";
 import { createContainer } from "unstated-next";
-import { RenVMFees } from "@renproject/interfaces";
-import { Bitcoin } from "@renproject/chains-bitcoin";
+import { Ethereum, Bitcoin } from "@renproject/chains";
 
 export function useFeesStore() {
   const {
     fees,
     convertAmount,
     convertSelectedDirection,
-    dataWeb3,
+    localWeb3,
     selectedNetwork,
 
     setConvertExchangeRate,
@@ -29,8 +27,14 @@ export function useFeesStore() {
 
   // External Data
   const updateRenVMFees = useCallback(async () => {
+    const web3 = localWeb3; //|| dataWeb3;
+    if (!sdk || !web3) return;
     try {
-      const data = await sdk?.getFees();
+      const data = await sdk.getFees({
+        asset: "BTC",
+        from: Bitcoin(),
+        to: Ethereum(web3.currentProvider as any, selectedNetwork),
+      });
       if (data) {
         setFees(data);
         return data;
@@ -40,25 +44,24 @@ export function useFeesStore() {
     } catch (e) {
       console.error(e);
     }
-  }, [setFees, sdk]);
+  }, [setFees, localWeb3, selectedNetwork, sdk]);
 
   const gatherFeeData = useCallback(
     async (directAmount?: number) => {
       let currentFees = fees;
       if (!fees) {
-        currentFees = await updateRenVMFees();
+        const res = await updateRenVMFees();
+        if (!res) return;
+        currentFees = res;
       }
+      if (!currentFees) return;
       const amount = directAmount || convertAmount;
       const selectedDirection = convertSelectedDirection;
-      const fixedFeeKey = selectedDirection ? "release" : "lock";
-      const dynamicFeeKey = selectedDirection ? "burn" : "mint";
 
-      const fixedFee = Number(currentFees![Asset.BTC][fixedFeeKey] / 10 ** 8);
-      const dynamicFeeRate = Number(
-        currentFees![Asset.BTC].ethereum[dynamicFeeKey] / 10000
-      );
+      const fixedFee = Number(currentFees.lock?.div(10 ** 8).toNumber() || 0);
+      const dynamicFeeRate = Number(currentFees.mint / 10000);
 
-      if (!amount || !dataWeb3 || !currentFees) return;
+      if (!amount || !localWeb3 || !currentFees) return;
 
       try {
         let exchangeRate: number;
@@ -68,7 +71,7 @@ export function useFeesStore() {
           Number(amount) *
             10 ** Bitcoin().assetDecimals(Asset.BTC.toUpperCase())
         );
-        const curve = new dataWeb3.eth.Contract(
+        const curve = new localWeb3.eth.Contract(
           curveABI as AbiItem[],
           selectedNetwork === "testnet" ? CURVE_TEST : CURVE_MAIN
         );
@@ -121,10 +124,11 @@ export function useFeesStore() {
       }
     },
     [
+      updateRenVMFees,
       convertAmount,
       convertSelectedDirection,
       fees,
-      dataWeb3,
+      localWeb3,
       selectedNetwork,
       setConvertExchangeRate,
       setConvertRenVMFee,
@@ -136,12 +140,18 @@ export function useFeesStore() {
   const getFinalDepositExchangeRate = useCallback(
     async (tx: Transaction) => {
       const { renResponse } = tx;
+      if (!fees || !localWeb3) {
+        throw "Missing fees or localweb3" + fees + localWeb3;
+      }
+      if (renResponse?.revert) {
+        throw new Error("Reverted");
+      }
 
-      const utxoAmountInSats = Number(renResponse.out.amount);
-      const dynamicFeeRate = Number(fees![Asset.BTC].ethereum["mint"] / 10000);
+      const utxoAmountInSats = Number(renResponse?.amount || 0);
+      const dynamicFeeRate = Number(fees.mint / 10000);
       const finalAmount = Math.round(utxoAmountInSats * (1 - dynamicFeeRate));
 
-      const curve = new dataWeb3!.eth.Contract(
+      const curve = new localWeb3.eth.Contract(
         curveABI as AbiItem[],
         selectedNetwork === "testnet" ? CURVE_TEST : CURVE_MAIN
       );
@@ -152,7 +162,7 @@ export function useFeesStore() {
         console.error(e);
       }
     },
-    [dataWeb3, fees, selectedNetwork]
+    [localWeb3, fees, selectedNetwork]
   );
 
   return {

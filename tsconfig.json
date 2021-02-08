@@ -16,9 +16,7 @@
     "noImplicitAny": true,
     "noEmit": true,
     "jsx": "react",
-    "plugins": [
-      { "name": "typescript-eslint-language-service" }
-    ]
+    "plugins": []
   },
   "include": ["src"]
 }

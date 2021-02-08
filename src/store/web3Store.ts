@@ -21,6 +21,7 @@ import {
 import { Store } from "./store";
 import { TransactionStore } from "./transactionStore";
 import { FeeStore } from "./feeStore";
+import { RenNetwork } from "@renproject/interfaces";
 
 function useWeb3() {
   const {
@@ -341,7 +342,9 @@ function useWeb3() {
 
   const setNetwork = useCallback(
     async function (network: "mainnet" | "testnet") {
-      setSelectedNetwork(network);
+      setSelectedNetwork(
+        network === "mainnet" ? RenNetwork.Mainnet : RenNetwork.Testnet
+      );
       setSdk(new RenSDK(network));
 
       await setAddresses(network).catch(console.error);

@@ -96,8 +96,8 @@ export const SwapRevertModalContainer: React.FC = () => {
   }
 
   const amount = Number(transaction.sourceAmount).toFixed(8);
-  const fixedFee = Number(fees[Asset.BTC]["lock"] / 10 ** 8);
-  const dynamicFeeRate = Number(fees[Asset.BTC].ethereum["mint"] / 10000);
+  const fixedFee = Number(fees.lock?.div(10 ** 8).toNumber());
+  const dynamicFeeRate = Number(fees.mint / 10000);
   const renVMFee = (Number(transaction.sourceAmount) * dynamicFeeRate).toFixed(
     8
   );

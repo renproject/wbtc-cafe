@@ -19,9 +19,10 @@ const useStyles = makeStyles((theme) => ({
 
 interface Props {
   tx: Transaction;
+  mint: any;
 }
 
-export const ConversionActions: React.FC<Props> = ({ tx }) => {
+export const ConversionActions: React.FC<Props> = ({ tx, mint }) => {
   const classes = useStyles();
   const {
     setShowGatewayModal,
@@ -121,7 +122,8 @@ export const ConversionActions: React.FC<Props> = ({ tx }) => {
                 if (direction === "out") {
                   // initConvertFromEthereum(tx);
                 } else {
-                  completeConvertToEthereum(tx);
+                  mint();
+                  // completeConvertToEthereum(tx);
                 }
               }}
             >
