@@ -137,16 +137,19 @@ function useWeb3() {
 
   const initDataWeb3 = useCallback(
     async (network: string) => {
-      const providedNetworkOrStore = network || selectedNetwork;
-      setDataWeb3(
-        new Web3(
-          `https://${
-            providedNetworkOrStore === "testnet" ? "kovan" : "mainnet"
-          }.infura.io/v3/${INFURA_KEY}`
-        )
-      );
+      // We no longer have the ability to preview fees for unconnected users
+      // but saves us from infura rate limits
+      // const providedNetworkOrStore = network || selectedNetwork;
+      // setDataWeb3(
+      //   new Web3(
+      //     `https://${
+      //       providedNetworkOrStore === "testnet" ? "kovan" : "mainnet"
+      //     }.infura.io/v3/${INFURA_KEY}`
+      //   )
+      //);
+      setDataWeb3(localWeb3);
     },
-    [selectedNetwork, setDataWeb3]
+    [localWeb3, setDataWeb3]
   );
 
   const getSignatures = useCallback(async (address: string, web3: Web3) => {
@@ -228,6 +231,7 @@ function useWeb3() {
     }
 
     setLocalWeb3(web3);
+    setDataWeb3(web3);
     setLocalWeb3Address(address);
 
     // recover from localStorage
