@@ -86,6 +86,7 @@ export function useTransactionLifecycle(
 
   const {
     getFinalDepositExchangeRate,
+    updateRenVMFees,
     gatherFeeData,
   } = FeeStore.useContainer();
 
@@ -257,7 +258,12 @@ export function useTransactionLifecycle(
 
       const { params, renSignature, minExchangeRate } = tx;
       // if swap will revert to renBTC, let the user know before proceeding
-      const exchangeRate = await getFinalDepositExchangeRate(tx);
+      // ensure fees
+      const fees = await updateRenVMFees();
+      if (!fees) {
+        throw Error("couldn't fetch fees");
+      }
+      const exchangeRate = await getFinalDepositExchangeRate(tx, fees);
       if (!exchangeRate || !minExchangeRate) {
         throw Error("missing exchange rates");
       }

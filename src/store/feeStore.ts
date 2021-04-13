@@ -42,6 +42,7 @@ export function useFeesStore() {
       });
       const data: UnmarshalledFees = (await fees.json()).result;
       setFees(data);
+      return data;
     } catch (e) {
       console.error(e);
     }
@@ -133,11 +134,11 @@ export function useFeesStore() {
   );
 
   const getFinalDepositExchangeRate = useCallback(
-    async (tx: Transaction) => {
+    async (tx: Transaction, fees: UnmarshalledFees) => {
       const { renResponse } = tx;
 
       const utxoAmountInSats = Number(renResponse.autogen.amount);
-      const dynamicFeeRate = Number(fees![Asset.BTC].ethereum["mint"] / 10000);
+      const dynamicFeeRate = Number(fees[Asset.BTC].ethereum["mint"] / 10000);
       const finalAmount = Math.round(utxoAmountInSats * (1 - dynamicFeeRate));
 
       const curve = new dataWeb3!.eth.Contract(
@@ -151,7 +152,7 @@ export function useFeesStore() {
         console.error(e);
       }
     },
-    [dataWeb3, fees, selectedNetwork]
+    [dataWeb3, selectedNetwork]
   );
 
   return {
