@@ -8,16 +8,6 @@ import React, { MouseEventHandler, useCallback, useState } from "react";
 import { ActionLink } from "../components/ActionLink";
 
 const useStyles = makeStyles((theme) => ({
-  modal: {
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    [theme.breakpoints.down("xs")]: {
-      overflowY: "scroll",
-      overflowX: "hidden",
-      alignItems: "flex-start",
-    },
-  },
   modalContent: {
     display: "flex",
     flexDirection: "column",
@@ -59,6 +49,7 @@ export const RedirectModalContainer: React.FC = () => {
         timeout: 500,
       }}
       disableBackdropClick
+      disableEscapeKeyDown
     >
       <Fade in={opened}>
         <div className={classes.modalContent}>
@@ -70,7 +61,7 @@ export const RedirectModalContainer: React.FC = () => {
               Wbtc.cafe has migrated to Badger Bridge. Please follow the link to
               begin new transactions.
             </Typography>
-            <Typography variant="caption">
+            <Typography variant="caption" paragraph>
               <ActionLink href={badgerUrl}>{badgerUrl}</ActionLink>
             </Typography>
           </div>
