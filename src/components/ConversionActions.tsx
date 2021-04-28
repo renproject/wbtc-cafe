@@ -1,7 +1,7 @@
 // eslint-disable jsx-a11y/anchor-is-valid
 
 import { makeStyles } from "@material-ui/core";
-import React from "react";
+import React, { useState } from "react";
 
 import { Store } from "../store/store";
 import { TransactionStore } from "../store/transactionStore";
@@ -36,6 +36,8 @@ export const ConversionActions: React.FC<Props> = ({ tx }) => {
   } = TransactionStore.useContainer();
 
   const direction = tx.destNetwork === "ethereum" ? "in" : "out";
+
+  const [submitting, setSubmitting] = useState(false);
 
   return (
     <React.Fragment>
@@ -117,15 +119,21 @@ export const ConversionActions: React.FC<Props> = ({ tx }) => {
           <React.Fragment>
             <a
               className={classes.viewLink}
-              onClick={() => {
-                if (direction === "out") {
-                  initConvertFromEthereum(tx);
-                } else {
-                  completeConvertToEthereum(tx);
+              onClick={async () => {
+                setSubmitting(true);
+                try {
+                  if (direction === "out") {
+                    await initConvertFromEthereum(tx);
+                  } else {
+                    await completeConvertToEthereum(tx);
+                  }
+                } catch (error) {
+                  alert(error);
                 }
+                setSubmitting(false);
               }}
             >
-              Submit
+              {submitting ? "Submitting..." : "Submit"}
             </a>
             {direction === "out" && (
               <a
