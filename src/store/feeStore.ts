@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react";
 import { AbiItem } from "web3-utils";
 import { UnmarshalledFees } from "@renproject/interfaces";
 import { useCallback, useEffect, useState } from "react";
@@ -145,10 +146,16 @@ export function useFeesStore() {
         selectedNetwork === "testnet" ? CURVE_TEST : CURVE_MAIN
       );
       try {
-        const swapResult = await curve.methods.get_dy(0, 1, finalAmount).call();
-        return Number(swapResult / finalAmount);
+        const swapResult = Number(
+          (await curve.methods.get_dy(0, 1, finalAmount).call()).toString()
+        );
+        return swapResult / finalAmount;
       } catch (e) {
         console.error(e);
+        Sentry.withScope(function (scope) {
+          scope.setTag("error-hint", "fetching deposit exhange rate");
+          Sentry.captureException(e);
+        });
       }
     },
     [dataWeb3, fees, selectedNetwork]

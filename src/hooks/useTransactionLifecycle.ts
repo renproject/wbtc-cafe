@@ -137,7 +137,7 @@ export function useTransactionLifecycle(
             // addEvent "reverted"
             Sentry.withScope(function (scope) {
               scope.setTag("error-hint", "transaction reverted");
-              Sentry.captureException(new Error("No reciept status"));
+              Sentry.captureException(new Error("No receipt status"));
             });
             updateTx({ ...tx, error: true, destTxHash: "" });
           } else {
@@ -240,53 +240,61 @@ export function useTransactionLifecycle(
   // and then submits to ethereum
   const completeConvertToEthereum = useCallback(
     async (transaction: Transaction, approveSwappedAsset?: string) => {
-      if (!localWeb3) {
-        return;
-      }
-      const renResponse = transaction.renResponse;
-
-      // amount user sent
-      const userBtcTxAmount = Number(
-        (renResponse.in.utxo.amount / 10 ** 8).toFixed(8)
-      );
-      // amount in renvm after fixed fee
-      const utxoAmountSats = renResponse.autogen.amount;
-
-      // update amount to the actual amount sent
-      const tx = updateTx({ ...transaction, sourceAmount: userBtcTxAmount });
-
-      const { params, renSignature, minExchangeRate } = tx;
-      // if swap will revert to renBTC, let the user know before proceeding
-      const exchangeRate = await getFinalDepositExchangeRate(tx);
-      if (!exchangeRate || !minExchangeRate) {
-        throw Error("missing exchange rates");
-      }
-      updateTx({ ...tx, exchangeRateOnSubmit: exchangeRate });
-      if (!approveSwappedAsset && exchangeRate < minExchangeRate) {
-        Sentry.withScope(function (scope) {
-          scope.setTag("error-hint", "exchange rate changed");
-          Sentry.captureMessage("Exchange rate below minimum");
-        });
-        setSwapRevertModalTx(tx.id);
-        setSwapRevertModalExchangeRate(exchangeRate.toFixed(8));
-        setShowSwapRevertModal(true);
-        updateTx({ ...tx, awaiting: "eth-init" });
-        return;
-      }
-
-      let newMinExchangeRate = params.contractCalls[0].contractParams[0].value;
-      if (approveSwappedAsset === Asset.WBTC) {
-        const rateMinusOne =
-          RenJS.utils.value(exchangeRate, Asset.BTC).sats().toNumber() - 1;
-        newMinExchangeRate = rateMinusOne.toFixed(0);
-      }
-
-      const adapterContract = new localWeb3.eth.Contract(
-        adapterABI as AbiItem[],
-        tx.adapterAddress
-      );
-
+      let tx = transaction;
       try {
+        if (!localWeb3) {
+          throw new Error(`No Web3 set.`);
+        }
+        const renResponse = transaction.renResponse;
+
+        // amount user sent
+        const userBtcTxAmount = Number(
+          (renResponse.in.utxo.amount / 10 ** 8).toFixed(8)
+        );
+        // amount in renvm after fixed fee
+        const utxoAmountSats = renResponse.autogen.amount;
+
+        // update amount to the actual amount sent
+        tx = updateTx({ ...transaction, sourceAmount: userBtcTxAmount });
+
+        const { params, renSignature, minExchangeRate } = tx;
+        // if swap will revert to renBTC, let the user know before proceeding
+        const exchangeRate = await getFinalDepositExchangeRate(tx);
+        console.log(
+          "exchangeRate",
+          exchangeRate,
+          "minExchangeRate",
+          minExchangeRate
+        );
+        if (!exchangeRate || !minExchangeRate) {
+          throw Error("missing exchange rates");
+        }
+        tx = updateTx({ ...tx, exchangeRateOnSubmit: exchangeRate });
+        if (!approveSwappedAsset && exchangeRate < minExchangeRate) {
+          Sentry.withScope(function (scope) {
+            scope.setTag("error-hint", "exchange rate changed");
+            Sentry.captureMessage("Exchange rate below minimum");
+          });
+          setSwapRevertModalTx(tx.id);
+          setSwapRevertModalExchangeRate(exchangeRate.toFixed(8));
+          setShowSwapRevertModal(true);
+          tx = updateTx({ ...tx, awaiting: "eth-init" });
+          return;
+        }
+
+        let newMinExchangeRate =
+          params.contractCalls[0].contractParams[0].value;
+        if (approveSwappedAsset === Asset.WBTC) {
+          const rateMinusOne =
+            RenJS.utils.value(exchangeRate, Asset.BTC).sats().toNumber() - 1;
+          newMinExchangeRate = rateMinusOne.toFixed(0);
+        }
+
+        const adapterContract = new localWeb3.eth.Contract(
+          adapterABI as AbiItem[],
+          tx.adapterAddress
+        );
+
         const contractCall = adapterContract.methods.mintThenSwap(
           params.contractCalls[0].contractParams[0].value,
           newMinExchangeRate,
@@ -324,6 +332,7 @@ export function useTransactionLifecycle(
         });
         console.error(e);
         updateTx({ ...tx, error: true });
+        throw e;
       }
     },
     [
