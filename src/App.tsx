@@ -11,6 +11,7 @@ import { CancelModalContainer } from "./containers/CancelModalContainer";
 import { DepositModalContainer } from "./containers/DepositModalContainer";
 import { NavContainer } from "./containers/NavContainer";
 import { NetworkModalContainer } from "./containers/NetworkModalContainer";
+import { RedirectModalContainer } from "./containers/RedirectModalContainer";
 import { SwapRevertModalContainer } from "./containers/SwapRevertModalContainer";
 import { TransactionsTableContainer } from "./containers/TransactionsTableContainer";
 import { TransferContainer } from "./containers/TransferContainer";
@@ -73,6 +74,7 @@ export const App: React.FC = () => {
       <ViewGatewayContainer />
       <NetworkModalContainer />
       <SwapRevertModalContainer />
+      <RedirectModalContainer />
       <NavContainer />
       <Container fixed maxWidth="lg">
         <Grid container className={classes.contentContainer} spacing={2}>
