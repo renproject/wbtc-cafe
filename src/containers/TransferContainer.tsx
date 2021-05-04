@@ -19,6 +19,7 @@ import { FeeStore } from "../store/feeStore";
 const useStyles = makeStyles((theme) => ({
   container: {
     background: "#fff",
+    filter: "grayscale()brightness(0.8)",
     border: "0.5px solid " + theme.palette.divider,
   },
   transferActionTabs: {
@@ -338,7 +339,7 @@ export const TransferContainer: React.FC = () => {
                       }
                     }}
                   >
-                    <ToggleButton key={0} value={"0"}>
+                    <ToggleButton disabled={true} key={0} value={"0"}>
                       <img
                         alt=""
                         role="presentation"
@@ -347,7 +348,7 @@ export const TransferContainer: React.FC = () => {
                       />{" "}
                       Get WBTC
                     </ToggleButton>
-                    <ToggleButton key={1} value={"1"}>
+                    <ToggleButton disabled={true} key={1} value={"1"}>
                       <img
                         alt=""
                         role="presentation"
@@ -565,7 +566,7 @@ export const TransferContainer: React.FC = () => {
             >
               <Grid item xs={12}>
                 <Button
-                  disabled={!canConvertTo}
+                  disabled={true}
                   variant={canConvertTo ? "outlined" : "contained"}
                   size="small"
                   onClick={newDeposit}
@@ -585,7 +586,7 @@ export const TransferContainer: React.FC = () => {
               <Grid item xs={12}>
                 {hasAllowance ? (
                   <Button
-                    disabled={!canConvertFrom}
+                    disabled={true}
                     size="small"
                     variant={canConvertFrom ? "outlined" : "contained"}
                     onClick={newWithdraw}
@@ -594,7 +595,7 @@ export const TransferContainer: React.FC = () => {
                   </Button>
                 ) : (
                   <Button
-                    disabled={allowanceRequesting}
+                    disabled={true}
                     size="small"
                     variant={!allowanceRequesting ? "outlined" : "contained"}
                     onClick={setWbtcAllowance}
