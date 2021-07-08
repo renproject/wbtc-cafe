@@ -57,7 +57,7 @@ export function useFeesStore() {
 
       const fixedFee = Number(fees![Asset.BTC][fixedFeeKey] / 10 ** 8);
       const dynamicFeeRate = Number(
-        fees![Asset.BTC].ethereum[dynamicFeeKey] / 10000
+        (dynamicFeeKey === "mint" ? 20 : 10) / 10000
       );
 
       if (!amount || !dataWeb3 || !fees) return;
@@ -138,7 +138,7 @@ export function useFeesStore() {
       const { renResponse } = tx;
 
       const utxoAmountInSats = Number(renResponse.autogen.amount);
-      const dynamicFeeRate = Number(fees![Asset.BTC].ethereum["mint"] / 10000);
+      const dynamicFeeRate = Number(20 / 10000);
       const finalAmount = Math.round(utxoAmountInSats * (1 - dynamicFeeRate));
 
       const curve = new dataWeb3!.eth.Contract(
